@@ -10,9 +10,10 @@ void initPLL(void);
 void initUART0(void);
 void send_string(char *strptr);
 void uart0_write(char data);
+void uart0_read();
 void initLCD8bit(void);
-void lcd_cmd(unsigned char cmd);
-void lcd_data(unsigned char d);
+void lcd_cmd(char cmd);
+void lcd_data(char d);
 void lcd_str_print(char *lcdptr);
 
 /* GSM related Functions */
@@ -24,6 +25,8 @@ void initGSM(void);
 
 
 
+char buff[200]; //array to send and receive data
+volatile int buffer_pointer;
 
 int main()
 {
@@ -100,6 +103,18 @@ void uart0_write(char data)
 }
 
 
+void uart0_read()
+{
+	/*making DLAB =0 ,leaving other bits unchanged
+	  since to access U0RBR DLAB bit must be 0
+	*/
+
+	U0LSR &= 0x7F; 
+	buff[buffer_pointer]=U0RBR;
+	buffer_pointer++ ;
+}
+
+
 void initLCD8bit(void)
 {
 	/*intializing pins for lcd 
@@ -128,11 +143,35 @@ void initLCD8bit(void)
 }
 
 
-void lcd_cmd(unsigned char cmd)
+void lcd_cmd(char cmd)
 {
 	
+	IO1PIN= ( (IO0PIN & 0xFF00FFFF ) | (cmd << 16 ) ) ;  //this is done because data pins start from P1.16 to P1.23
+	IO1PIN= ( IO1PIN & 0xF4FFFFFF);                      //rs=0 ,rw=0 ,en=1 rest port 1 values are not changed
+	delayMS(1000);
+	IO1PIN= (IO1PIN & 0x F7FFFFFF); 		    // rs=0 ,rw=0 ,en=0 rest port 1 values are not changed	 
+}
+
+
+void lcd_data(char d)
+{
+	IO1PIN= ( (IO0PIN & 0xFF00FFFF ) | (cmd << d ) ) ;  //this is done because data pins start from P1.16 to P1.23
+	IO1PIN= ( IO1PIN & 0xF5FFFFFF);                      //rs=1 ,rw=0 ,en=1 rest port 1 values are not changed
+	delayMS(1000);
+	IO1PIN= (IO1PIN & 0x F4FFFFFF); 		    // rs=1 ,rw=0 ,en=0 rest port 1 values are not changed	
 
 
 }
-void lcd_data(unsigned char d);
-void lcd_str_print(char *lcdptr);
+
+
+void lcd_str_print(char *lcdptr)
+{
+
+	int i=0;
+	while (lcdptr[i] != '\0' )
+		{
+			lcd_data(lcdptr[i]);
+			i++;
+		}
+
+}
