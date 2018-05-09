@@ -5,12 +5,12 @@
 
 /*Functions Decleration */
 
-void delayMS(unsigned char time);
+void delayMS(unsigned int time);
 void initPLL(void);
 void initUART0(void);
 void send_string(char *strptr);
 void uart0_write(char data);
-void uart0_read();
+char uart0_read(void);
 void initLCD8bit(void);
 void lcd_cmd(char cmd);
 void lcd_data(char d);
@@ -36,7 +36,7 @@ int main()
 
 }
 
-void delayMS(unsigned char time)
+void delayMS(unsigned int time)
 {
 	//Configuring timer for 1 sec delay
 	
@@ -61,7 +61,7 @@ void initPLL(void)
 	PLL0FEED=0xAA;//feed sequence
 	PLL0FEED=0x55;
 	
-	while(!(PLL0STAT & 0x00000400)) ;  wait here until PLL gets in locked status
+	while(!(PLL0STAT & 0x00000400)) ;  //wait here until PLL gets in locked status
 	
 	PLL0CON=0x03;
 	PLL0FEED=0xAA;//feed sequence
@@ -86,7 +86,7 @@ void initUART0(void)
 
 void send_string(char *strptr)
 {
-	while(strptr != '\0 ' )  /* error */
+	while(strptr != 0  )  
 		{
 			uart0_write(*strptr);
 			strptr++ ;
@@ -103,17 +103,18 @@ void uart0_write(char data)
 }
 
 
-void uart0_read()
+char uart0_read()
 {
 	/*making DLAB =0 ,leaving other bits unchanged
 	  since to access U0RBR DLAB bit must be 0
 	*/
 
 	U0LSR &= 0x7F; 
-	buff[buffer_pointer]=U0RBR;
-	buffer_pointer++ ;
+	while ( ! ( U0LSR & (1<<0) )  ); //wait here until U0RBR gets valid data
+	
+	return U0RBR;
 }
-
+/*  VVIMP: declare a char variable outside main and inside main function use that variable to catch this functions value*/
 
 void initLCD8bit(void)
 {
@@ -126,7 +127,7 @@ void initLCD8bit(void)
 
 	 */
 
-		IO1DIR = 0x07FF0000 // making data,rs,rw,en as output port
+		IO1DIR = 0x07FF0000; // making data,rs,rw,en as output port
 		delayMS(1000);
 				
 
@@ -149,16 +150,16 @@ void lcd_cmd(char cmd)
 	IO1PIN= ( (IO0PIN & 0xFF00FFFF ) | (cmd << 16 ) ) ;  //this is done because data pins start from P1.16 to P1.23
 	IO1PIN= ( IO1PIN & 0xF4FFFFFF);                      //rs=0 ,rw=0 ,en=1 rest port 1 values are not changed
 	delayMS(1000);
-	IO1PIN= (IO1PIN & 0x F7FFFFFF); 		    // rs=0 ,rw=0 ,en=0 rest port 1 values are not changed	 
+	IO1PIN= (IO1PIN & 0xF7FFFFFF); 		    // rs=0 ,rw=0 ,en=0 rest port 1 values are not changed	 
 }
 
 
 void lcd_data(char d)
 {
-	IO1PIN= ( (IO0PIN & 0xFF00FFFF ) | (cmd << d ) ) ;  //this is done because data pins start from P1.16 to P1.23
+	IO1PIN= ( (IO0PIN & 0xFF00FFFF ) | (d << 16 ) ) ;  //this is done because data pins start from P1.16 to P1.23
 	IO1PIN= ( IO1PIN & 0xF5FFFFFF);                      //rs=1 ,rw=0 ,en=1 rest port 1 values are not changed
 	delayMS(1000);
-	IO1PIN= (IO1PIN & 0x F4FFFFFF); 		    // rs=1 ,rw=0 ,en=0 rest port 1 values are not changed	
+	IO1PIN= (IO1PIN & 0xF4FFFFFF); 		    // rs=1 ,rw=0 ,en=0 rest port 1 values are not changed	
 
 
 }
