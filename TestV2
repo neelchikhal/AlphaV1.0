@@ -1,0 +1,200 @@
+#include<lpc214x.h>
+#include<stdio.h>
+#include<string.h>
+
+
+/*Functions Decleration */
+
+void delayMS(unsigned int time);
+void delay_ms(int j);
+
+
+void initPLL(void);
+void initUART0(void);
+void initLCD8bit(void);
+
+void send_string(char *strptr);
+void uart0_write(char data);
+char uart0_read(void);
+
+void lcd_cmd(char cmd);
+void lcd_data(char d);
+void lcd_str_print(char *lcdptr);
+
+
+
+
+
+
+
+
+char buff[8]; //array to send and receive data
+volatile int buffer_pointer;
+char rbr_data;
+char *rbrptr;
+int main()
+{
+	rbrptr=&rbr_data;
+	initPLL();
+	initUART0();	
+	//initLCD8bit();
+	send_string("hello");
+	//rbr_data=uart0_read();
+	while(1)
+		{
+				//lcd_str_print(rbrptr);
+		send_string("hello");
+		}
+	
+
+}
+
+void delayMS(unsigned int time)
+{
+	//Configuring timer for 1 sec delay
+	
+	
+	T0CTCR=0x00; //setting timer in timer mode
+	T0PR=59999;
+	T0TCR=0x02; //reset timer
+
+	T0TCR=0x01; //enable timer
+			
+	while (T0TC < time ); //stay here until TC reaches desired delay
+	
+	T0TCR=0x00; //disable timer
+
+	
+}
+
+void initPLL(void)
+{
+	PLL0CON=0x01;
+	PLL0CFG=0x24; //M=4,P=2,Fosc=12MHz,CCLK=60Mhz
+	PLL0FEED=0xAA;//feed sequence
+	PLL0FEED=0x55;
+	
+	while(!(PLL0STAT & 0x00000400)) ;  //wait here until PLL gets in locked status
+	
+	PLL0CON=0x03;
+	PLL0FEED=0xAA;//feed sequence
+	PLL0FEED=0x55;
+	
+	VPBDIV=0x01;
+
+}
+
+void initUART0(void)
+{
+	PINSEL0 = 0x5;  /* Select TxD for P0.0 and RxD for P0.1 */
+ // UART set at 9600Mhz PCLK=60Mhz MulVal=15 DivAddVal=0
+	U0LCR=3 | (1<<7);
+	U0DLL=110;
+	U0DLM=1;
+	U0FDR=0xF0;
+	U0LCR &= 0x7F; // Set DLAB=0 to lock MULVAL and DIVADDVAL
+
+}
+
+
+void send_string(char *strptr)
+{
+	while(strptr != 0  )  
+		{
+			uart0_write(*strptr);
+			strptr++ ;
+		}
+
+}
+
+
+void uart0_write(char data)
+{
+	while ( ! ( U0LSR & (1<<5) )  ); //wait here until THR gets empty
+		
+	U0THR=data;
+}
+
+
+char uart0_read()
+{
+	/*making DLAB =0 ,leaving other bits unchanged
+	  since to access U0RBR DLAB bit must be 0
+	*/
+
+	U0LSR &= 0x7F; 
+	while ( ! ( U0LSR & (1<<0) )  ); //wait here until U0RBR gets valid data
+	
+	return U0RBR;
+}
+/*  VVIMP: declare a char variable outside main and inside main function use that variable to catch this functions value*/
+
+void initLCD8bit(void)
+{
+	/*intializing pins for lcd 
+	
+		data --> PORT1.16 to PORT1.23
+		rs--> PORT1.24
+		rw--> PORT1.25
+		en--> PORT1.26
+
+	 */
+
+		IO1DIR = 0x07FF0000; // making data,rs,rw,en as output port
+		delayMS(100);
+				
+
+	/* Initializing LCD */
+	lcd_cmd(0x38); //2-lines 5X7 matrix
+	delayMS(100); 
+	lcd_cmd(0x0E); //display on cursor on
+	delayMS(100);
+	lcd_cmd(0x06); // Auto increment cursor 
+	delayMS(100);
+	lcd_cmd(0x80); // force cursor to the beginning of 1st line
+	delayMS(100); 
+	
+}
+
+
+void lcd_cmd(char cmd)
+{
+	
+	IO1PIN= ( (IO0PIN & 0xFF00FFFF ) | (cmd << 16 ) ) ;  //this is done because data pins start from P1.16 to P1.23
+	IO1PIN= ( IO1PIN & 0xF4FFFFFF);                      //rs=0 ,rw=0 ,en=1 rest port 1 values are not changed
+	delayMS(100);
+	IO1PIN= (IO1PIN & 0xF7FFFFFF); 		    // rs=0 ,rw=0 ,en=0 rest port 1 values are not changed	 
+}
+
+
+void lcd_data(char d)
+{
+	IO1PIN= ( (IO0PIN & 0xFF00FFFF ) | (d << 16 ) ) ;  //this is done because data pins start from P1.16 to P1.23
+	IO1PIN= ( IO1PIN & 0xF5FFFFFF);                      //rs=1 ,rw=0 ,en=1 rest port 1 values are not changed
+	delayMS(100);
+	IO1PIN= (IO1PIN & 0xF4FFFFFF); 		    // rs=1 ,rw=0 ,en=0 rest port 1 values are not changed	
+
+
+}
+
+
+void lcd_str_print(char *lcdptr)
+{
+
+	int i=0;
+	while (lcdptr[i] != '\0' )
+		{
+			lcd_data(lcdptr[i]);
+			i++;
+		}
+
+}
+
+void delay_ms(int j)
+{
+    int x,i;
+	for(i=0;i<j;i++)
+	{
+    for(x=0; x<6000; x++);    /* loop to generate 1 milisecond delay with Cclk = 60MHz */
+	}
+}
